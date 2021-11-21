@@ -2,6 +2,7 @@ library(tidyverse)
 library(here)
 library(googlesheets4)
 library(stringr)
+library(fuzzyjoin)
 
 # Supreme Court decisions data
 sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
@@ -77,12 +78,11 @@ sc_decisions <- sc_decisions %>% filter(sc_decisions$yearDecision %in% (2000:201
 sc_decisions <- sc_decisions %>% filter(sc_decisions$direction %in% (1:2))
 sc_decisions$direction <- ifelse(sc_decisions$direction == 1, "Conservative", "Liberal")
 
-# Mapping issue area of the case
-sc_decisions <- sc_decisions %>%
-  left_join(issueArea, by = c("issueArea" = "issueArea"))
-
 # Remove columns that have already been mapped or scrubbed
-sc_decisions = sc_decisions[,!(names(sc_decisions) %in% c("dateDecision","issueArea", "justice"))]
+sc_decisions = sc_decisions[,!(names(sc_decisions) %in% c("dateDecision", "justice"))]
+
+# Mapping issue area of the case
+sc_decisions$issueArea <- with(issueArea, issueAreaName[match(sc_decisions$issueAre, issueArea)])
 
 # Mapping states to columns with states
 sc_decisions$petitionerState <- with(state, StateName[match(sc_decisions$petitionerState, StateValue)])
@@ -109,3 +109,33 @@ sc_decisions$certReason <- with(certReason, CertReasonName[match(sc_decisions$ce
 # Mapping lower court disposition direction
 sc_decisions$lcDispositionDirection <- ifelse(sc_decisions$lcDispositionDirection == 1, "Conservative", 
                                               ifelse(sc_decisions$lcDispositionDirection == 2, "Liberal", "Unspecified"))
+
+# Calculate judge's age at decision year
+sc_decisions$age <- as.numeric(sc_decisions$yearDecision) - as.numeric(sc_decisions$birthYear)
+
+# Map house, senate and presidential parties
+house$houseMajority <- ifelse(house$`Democrats Seats`/house$`Total Seats` > 0.5, "Democrat", "Republican")
+senate$senateMajority <- ifelse(senate$`Democrats Seats`/senate$`Total Seats` > 0.5, "Democrat", "Republican")
+
+sc_decisions <- fuzzy_left_join(sc_decisions, house[,c("Start Year","End Year","houseMajority")], 
+                  by = c("yearDecision" = "Start Year", "yearDecision" = "End Year"), 
+                  match_fun = list(`>=`, `<=`))
+
+sc_decisions = subset(sc_decisions, select = -c(`Start Year`,`End Year`))
+
+sc_decisions <- fuzzy_left_join(sc_decisions, senate[,c("Start Year","End Year","senateMajority")], 
+                                by = c("yearDecision" = "Start Year", "yearDecision" = "End Year"), 
+                                match_fun = list(`>=`, `<=`))
+
+sc_decisions = subset(sc_decisions, select = -c(`Start Year`,`End Year`))
+
+names(presidents)[names(presidents) == "party"] <- "decisionPresident"
+names(presidents)[names(presidents) == "startYear"] <- "presidentStartYear"
+names(presidents)[names(presidents) == "endYear"] <- "presidentEndYear"
+
+sc_decisions <- fuzzy_left_join(sc_decisions, presidents[,c("presidentStartYear","presidentEndYear","decisionPresident")], 
+                                by = c("yearDecision" = "presidentStartYear", "yearDecision" = "presidentEndYear"), 
+                                match_fun = list(`>=`, `<=`))
+
+sc_decisions = subset(sc_decisions, select = -c(`presidentStartYear`,`presidentEndYear`))
+
