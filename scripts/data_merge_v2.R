@@ -34,8 +34,22 @@ certReason <- read_sheet(extra_data_sheet, sheet = "CertReason", skip = 1)
 
 # Characteristics relating to justices
 justices <- justices_raw %>%
-  select(justiceId = justice, yearAppointed, presidentId, gender, birthYear, state, religion, ethnicity) %>%
-  left_join(select(presidents, -name, startYear, endYear), by = "presidentId") 
+  select(
+    justiceId = justice, 
+    justiceYearAppointed = yearAppointed, 
+    justicePresidentId = presidentId, 
+    justiceGender = gender, 
+    justiceBirthYear = birthYear, 
+    justiceState = state, 
+    justiceReligion = religion, 
+    justiceEthnicity = ethnicity,
+    votesForAppointed = votesFor,
+    votesAgainstAppointed = votesAgainst,
+    justiceLowerCourt = lowerCourt) %>%
+  left_join(
+    select(presidents, -name, startYear, endYear), 
+    by = c("justicePresidentId" = "presidentId")) %>%
+  rename(justicePresidentParty = party) 
 
 # Put data together
 sc_decisions <- sc_decisions_raw %>%
@@ -70,19 +84,19 @@ sc_decisions <- sc_decisions_raw %>%
     direction) %>%
   left_join(justices, by = c("justiceName" = "justiceId"))
 
-# Filter for cases with decision date between 2000 to 2019
-sc_decisions$yearDecision <- str_sub(sc_decisions$dateDecision,-4,-1)
-sc_decisions <- sc_decisions %>% filter(sc_decisions$yearDecision %in% (2000:2019))
 
-# Filter for cases where decisions are Liberal or Conservative
-sc_decisions <- sc_decisions %>% filter(sc_decisions$direction %in% (1:2))
-sc_decisions$direction <- ifelse(sc_decisions$direction == 1, "Conservative", "Liberal")
-
-# Remove columns that have already been mapped or scrubbed
-sc_decisions = sc_decisions[,!(names(sc_decisions) %in% c("dateDecision", "justice"))]
+sc_decisions <- sc_decisions %>%
+  # Filter for cases with decision date between 2000 to 2019
+  mutate(yearDecision = str_sub(dateDecision, -4, -1)) %>%
+  filter(yearDecision %in% 2000:2019) %>%
+  # Filter for cases where decisions are liberal or conservative 
+  filter(direction %in% 1:2) %>%
+  mutate(direction = ifelse(direction == 1, "Conservative", "Liberal")) %>%
+  # Remove columns that have been mapped or scrubbed
+  select(-dateDecision, -justice)
 
 # Mapping issue area of the case
-sc_decisions$issueArea <- with(issueArea, issueAreaName[match(sc_decisions$issueAre, issueArea)])
+sc_decisions$issueArea <- with(issueArea, issueAreaName[match(sc_decisions$issueArea, issueArea)])
 
 # Mapping states to columns with states
 sc_decisions$petitionerState <- with(state, StateName[match(sc_decisions$petitionerState, StateValue)])
@@ -111,7 +125,7 @@ sc_decisions$lcDispositionDirection <- ifelse(sc_decisions$lcDispositionDirectio
                                               ifelse(sc_decisions$lcDispositionDirection == 2, "Liberal", "Unspecified"))
 
 # Calculate judge's age at decision year
-sc_decisions$age <- as.numeric(sc_decisions$yearDecision) - as.numeric(sc_decisions$birthYear)
+sc_decisions$age <- as.numeric(sc_decisions$yearDecision) - as.numeric(sc_decisions$justiceBirthYear)
 
 # Map house, senate and presidential parties
 house$houseMajority <- ifelse(house$`Democrats Seats`/house$`Total Seats` > 0.5, "Democrat", "Republican")
