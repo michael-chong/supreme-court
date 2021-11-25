@@ -2,7 +2,6 @@ library(tidyverse)
 library(here)
 library(googlesheets4)
 library(stringr)
-library(fuzzyjoin)
 
 # Supreme Court decisions data
 sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
@@ -10,15 +9,21 @@ sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.cs
 # Import external data
 extra_data_sheet <- "https://docs.google.com/spreadsheets/d/1QzVsdjHLv5Mr3eSMi7CSVvd5z3qwUd7K349cAMwaqRg/edit?usp=sharing"
 
-senate <- read_sheet(extra_data_sheet, sheet = "Senate", skip = 1)
+senate <- read_sheet(extra_data_sheet, sheet = "Senate", skip = 1) %>%
+  mutate(startDate = str_c(`Start Day`, `Start Month`, `Start Year`, sep = "/")) %>%
+  mutate(startDate = as.Date(startDate, format = "%d/%m/%Y"))
 
 justices_raw <- read_sheet(extra_data_sheet, sheet = "Justices", skip =1) %>%
   janitor::clean_names(case = "lower_camel") 
 
-house <- read_sheet(extra_data_sheet, sheet = "House of Representatives", skip = 1)
+house <- read_sheet(extra_data_sheet, sheet = "House of Representatives", skip = 1) %>%
+  mutate(startDate = str_c(`Start Day`, `Start Month`, `Start Year`, sep = "/")) %>%
+  mutate(startDate = as.Date(startDate, format = "%d/%m/%Y"))
 
 presidents <- read_sheet(extra_data_sheet, sheet = "Presidency", skip = 1) %>%
-  janitor::clean_names(case = "lower_camel")
+  mutate(startDate = str_c(`Start Day`, `Start Month`, `Start Year`, sep = "/")) %>%
+  mutate(startDate = as.Date(startDate, format = "%d/%m/%Y")) %>%
+  janitor::clean_names(case = "lower_camel") 
 
 issueArea <- read_sheet(extra_data_sheet, sheet = "IssueArea", skip = 1)
 
@@ -84,16 +89,17 @@ sc_decisions <- sc_decisions_raw %>%
     direction) %>%
   left_join(justices, by = c("justiceName" = "justiceId"))
 
-
 sc_decisions <- sc_decisions %>%
   # Filter for cases with decision date between 2000 to 2019
   mutate(yearDecision = str_sub(dateDecision, -4, -1)) %>%
   filter(yearDecision %in% 2000:2019) %>%
+  # Turn dates into date objects
+  mutate(dateDecision = as.Date(dateDecision, format = "%m/%d/%Y")) %>%
   # Filter for cases where decisions are liberal or conservative 
   filter(direction %in% 1:2) %>%
   mutate(direction = ifelse(direction == 1, "Conservative", "Liberal")) %>%
   # Remove columns that have been mapped or scrubbed
-  select(-dateDecision, -justice)
+  select(-justice)
 
 # Mapping issue area of the case
 sc_decisions$issueArea <- with(issueArea, issueAreaName[match(sc_decisions$issueArea, issueArea)])
@@ -125,31 +131,36 @@ sc_decisions$lcDispositionDirection <- ifelse(sc_decisions$lcDispositionDirectio
                                               ifelse(sc_decisions$lcDispositionDirection == 2, "Liberal", "Unspecified"))
 
 # Calculate judge's age at decision year
-sc_decisions$age <- as.numeric(sc_decisions$yearDecision) - as.numeric(sc_decisions$justiceBirthYear)
+sc_decisions$justiceAge <- as.numeric(sc_decisions$yearDecision) - as.numeric(sc_decisions$justiceBirthYear)
 
 # Map house, senate and presidential parties
-house$houseMajority <- ifelse(house$`Democrats Seats`/house$`Total Seats` > 0.5, "Democrat", "Republican")
-senate$senateMajority <- ifelse(senate$`Democrats Seats`/senate$`Total Seats` > 0.5, "Democrat", "Republican")
+house <- house %>%
+  mutate(houseMajority = ifelse(houseDemocratSeats > houseRepublicanSeats, "Democrat", "Republican"))
 
-sc_decisions <- fuzzy_left_join(sc_decisions, house[,c("Start Year","End Year","houseMajority")], 
-                  by = c("yearDecision" = "Start Year", "yearDecision" = "End Year"), 
-                  match_fun = list(`>=`, `<=`))
+# senate$senateMajority <- ifelse(senate$`Democrats Seats`/senate$`Total Seats` > 0.5, "Democrat", "Republican")
+# Note: When Senate is tied 50-50, the Vice-President is the tie-breaker, so the majority is coded manually
 
-sc_decisions = subset(sc_decisions, select = -c(`Start Year`,`End Year`))
+sc_decisions <- sc_decisions %>%
+  mutate(congress = as.Date(cut.Date(dateDecision, breaks = house$startDate))) %>%
+  left_join(house, by = c("congress" = "startDate")) %>%
+  select(-contains("start"), -contains("end"))
+  
+sc_decisions <- sc_decisions %>%
+  mutate(congress = as.Date(cut.Date(dateDecision, breaks = senate$startDate))) %>%
+  left_join(senate, by = c("congress" = "startDate")) %>%
+  select(-contains("start"), -contains("end"))
 
-sc_decisions <- fuzzy_left_join(sc_decisions, senate[,c("Start Year","End Year","senateMajority")], 
-                                by = c("yearDecision" = "Start Year", "yearDecision" = "End Year"), 
-                                match_fun = list(`>=`, `<=`))
+presidents <- presidents %>% 
+  rename(
+    decisionPresidentParty = party,
+    decisionPresident = presidentId
+  ) %>%
+  select(-name)
 
-sc_decisions = subset(sc_decisions, select = -c(`Start Year`,`End Year`))
+sc_decisions <- sc_decisions %>%
+  mutate(presidentDate = as.Date(cut.Date(dateDecision, breaks = presidents$startDate))) %>%
+  left_join(presidents, by = c("presidentDate" = "startDate")) 
 
-names(presidents)[names(presidents) == "party"] <- "decisionPresident"
-names(presidents)[names(presidents) == "startYear"] <- "presidentStartYear"
-names(presidents)[names(presidents) == "endYear"] <- "presidentEndYear"
-
-sc_decisions <- fuzzy_left_join(sc_decisions, presidents[,c("presidentStartYear","presidentEndYear","decisionPresident")], 
-                                by = c("yearDecision" = "presidentStartYear", "yearDecision" = "presidentEndYear"), 
-                                match_fun = list(`>=`, `<=`))
-
-sc_decisions = subset(sc_decisions, select = -c(`presidentStartYear`,`presidentEndYear`))
+sc_decisions <- sc_decisions %>%
+  select(-contains("start"), -contains("end"))
 
