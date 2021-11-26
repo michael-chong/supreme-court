@@ -6,6 +6,9 @@ library(stringr)
 # Supreme Court decisions data
 sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
 
+# Alternate reading code in case here didn't work
+# sc_decisions_raw <- read_csv("GitHub/supreme-court/data/SCDB_2021_01_justiceCentered_Citation.csv")
+
 # Import external data
 extra_data_sheet <- "https://docs.google.com/spreadsheets/d/1QzVsdjHLv5Mr3eSMi7CSVvd5z3qwUd7K349cAMwaqRg/edit?usp=sharing"
 
@@ -36,6 +39,8 @@ caseOrigin <- read_sheet(extra_data_sheet, sheet = "CaseOrigin", skip = 1)
 lcDisposition <- read_sheet(extra_data_sheet, sheet = "LowerCourtDisposition", skip = 1)
 
 certReason <- read_sheet(extra_data_sheet, sheet = "CertReason", skip = 1)
+
+approval <- read_sheet(extra_data_sheet, sheet = "Approval", skip = 1)
 
 # Characteristics relating to justices
 justices <- justices_raw %>%
@@ -233,7 +238,17 @@ sc_decisions <- sc_decisions %>%
          -dateRearg,
          -petitionerState,
          -respondentState)
-  
 
+# Add Approval rating column
+approval <- approval %>%
+  select("yearDecision", "CourtApproval")
 
+approval$yearDecision <- as.character(approval$yearDecision)
+
+sc_decisions <- sc_decisions %>%
+  left_join(approval, by = c("yearDecision"))
+
+# Add Approval rating column
+sc_decisions <- sc_decisions %>% 
+                  mutate(justiceAgeBand = ifelse(justiceAge <= 65 , "0-65", "65+"))
 
