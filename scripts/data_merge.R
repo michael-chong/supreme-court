@@ -1,7 +1,15 @@
+packages <- c("tidyverse", "here", "googlesheets4", "stringr", "fuzzyjoin", "sqldf", "janitor")
+install.packages(setdiff(packages, rownames(installed.packages())), repos = "http://cran.us.r-project.org")
+
 library(tidyverse)
 library(here)
 library(googlesheets4)
 library(stringr)
+library(fuzzyjoin)
+library(sqldf)
+library(janitor)
+
+googlesheets4::gs4_deauth()
 
 # Supreme Court decisions data
 sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
@@ -248,7 +256,88 @@ approval$yearDecision <- as.character(approval$yearDecision)
 sc_decisions <- sc_decisions %>%
   left_join(approval, by = c("yearDecision"))
 
-# Add Approval rating column
+# Group Justice age to age band
 sc_decisions <- sc_decisions %>% 
-                  mutate(justiceAgeBand = ifelse(justiceAge <= 65 , "0-65", "65+"))
+                  mutate(justiceDecisionAgeBand = ifelse(justiceAge <= 65 , "0-65", "65+"))
 
+
+# There are many case origins so I'd like to map them to regions and court types
+caseOrigin <- unique(sc_decisions$caseOrigin)
+caseOrigin <- data.frame(caseOrigin)
+
+region <- state %>%
+  select("StateName", "RegionName")
+
+caseOrigin <- caseOrigin %>%
+                regex_inner_join(state, by = c(caseOrigin = "StateName")) %>%
+                select(-StateValue) %>%
+                rename(caseOriginRegion = RegionName, caseOriginSate = StateName)
+
+caseOrigin <- caseOrigin %>% 
+  mutate(caseOriginCourt = if_else(str_detect(caseOrigin, "District Court"), "District Court", 
+                                   if_else(str_detect(caseOrigin, "Trial Court"), "Trial Court", 
+                                           if_else(str_detect(caseOrigin, "Appellate Court"), "Appellate Court","Others"))))
+
+sc_decisions <- sc_decisions %>%
+  left_join(caseOrigin, by = c("caseOrigin"))
+
+# Map justice's region too
+justiceRegion <- state %>%
+  select("StateName", "RegionName") %>%
+  rename(justiceRegion = RegionName, justiceState = StateName)
+
+sc_decisions <- sc_decisions %>%
+  left_join(justiceRegion, by = c("justiceState"))
+
+# Group Vote Appointed for each Justice
+sc_decisions <- sc_decisions %>% 
+  mutate(justiceVotesAppointed = if_else(votesForAppointed/(votesForAppointed+votesAgainstAppointed) >= 0.75, ">=75%", "<75%"))
+                
+# Rearrange columns for model fitting
+sc_decisions_final <- sc_decisions %>%
+  select(
+    chief, 
+    lcDisagreement,
+    lcDispositionDirection,
+    issueArea,
+    adminActionBool,
+    oralArgBool,
+    reargBool,
+    decisionTime,
+    formerCourt,
+    CourtApproval,
+    caseOriginRegion,
+    caseOriginCourt)
+
+sc_decisions_final <- sqldf('
+                            SELECT chief                    AS c_chief
+                                   ,lcDisagreement          AS c_lcDisagreement
+                                   ,lcDispositionDirection  AS c_lcDispositionDirection
+                                   ,issueArea               AS c_issueArea
+                                   ,adminActionBool         AS c_adminActionBool
+                                   ,oralArgBool             AS c_oralArgBool
+                                   ,reargBool               AS c_reargBool
+                                   ,CASE 
+                                      WHEN decisionTime <= 30 THEN "0-30 Days"
+                                      WHEN decisionTime <= 180 THEN "31-180 Days"
+                                      ELSE "181+ Days"
+                                    END AS c_decisionTime
+                                   ,formerCourt             AS c_formerCourt
+                                   ,caseOriginRegion        AS c_caseOriginRegion
+                                   ,caseOriginCourt         AS c_caseOriginCourt
+                                   ,houseMajority           AS e_houseMajority
+                                   ,senateMajority          AS e_senateMajority
+                                   ,decisionPresidentParty  AS e_decisionPresidentParty
+                                   ,courtApproval           AS e_JCApproval
+                                   ,justiceDecisionAgeBand  AS j_justiceDecisionAgeBand
+                                   ,justiceRegion           AS j_justiceRegion
+                                   ,justiceReligion         AS j_justiceReligion
+                                   ,justiceEthnicity        AS j_justiceEthnicity
+                                   ,justicePresidentParty   AS j_justicePresidentParty
+                                   ,justiceVotesAppointed   AS j_justiceVotesAppointed
+                                   ,direction
+                            FROM sc_decisions
+                            ')
+
+# write final df to data file
+write.csv(sc_decisions_final, here("data/sc_decisions_final.csv"))
