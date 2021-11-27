@@ -14,9 +14,6 @@ googlesheets4::gs4_deauth()
 # Supreme Court decisions data
 sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
 
-# Alternate reading code in case here didn't work
-# sc_decisions_raw <- read_csv("GitHub/supreme-court/data/SCDB_2021_01_justiceCentered_Citation.csv")
-
 # Import external data
 extra_data_sheet <- "https://docs.google.com/spreadsheets/d/1QzVsdjHLv5Mr3eSMi7CSVvd5z3qwUd7K349cAMwaqRg/edit?usp=sharing"
 
@@ -341,3 +338,4 @@ sc_decisions_final <- sqldf('
 
 # write final df to data file
 write.csv(sc_decisions_final, here("data/sc_decisions_final.csv"))
+
