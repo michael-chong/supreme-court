@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.DS_store
+*.Rproj
+*~$*
+data/STA2052_Data_Checked.xlsx
+*.DS_Store
+*checkpoint.ipynb
