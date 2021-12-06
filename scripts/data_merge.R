@@ -1,9 +1,15 @@
+packages <- c("tidyverse", "here", "googlesheets4", "stringr", "fuzzyjoin", "sqldf", "janitor")
+install.packages(setdiff(packages, rownames(installed.packages())), repos = "http://cran.us.r-project.org")
+
 library(tidyverse)
 library(here)
 library(googlesheets4)
 library(stringr)
 library(fuzzyjoin)
 library(sqldf)
+library(janitor)
+
+googlesheets4::gs4_deauth()
 
 # Supreme Court decisions data
 # sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
@@ -343,3 +349,7 @@ sc_decisions_final <- sqldf('
                                    ,direction
                             FROM sc_decisions
                             ')
+
+# write final df to data file
+write.csv(sc_decisions_final, here("data/sc_decisions_final.csv"))
+
