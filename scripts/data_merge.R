@@ -6,10 +6,10 @@ library(fuzzyjoin)
 library(sqldf)
 
 # Supreme Court decisions data
-sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
+# sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
 
 # Alternate reading code in case here didn't work
-# sc_decisions_raw <- read_csv("GitHub/supreme-court/data/SCDB_2021_01_justiceCentered_Citation.csv")
+ sc_decisions_raw <- read_csv("GitHub/supreme-court/data/SCDB_2021_01_justiceCentered_Citation.csv")
 
 # Import external data
 extra_data_sheet <- "https://docs.google.com/spreadsheets/d/1QzVsdjHLv5Mr3eSMi7CSVvd5z3qwUd7K349cAMwaqRg/edit?usp=sharing"
@@ -286,23 +286,33 @@ sc_decisions <- sc_decisions %>%
 # Group Vote Appointed for each Justice
 sc_decisions <- sc_decisions %>% 
   mutate(justiceVotesAppointed = if_else(votesForAppointed/(votesForAppointed+votesAgainstAppointed) >= 0.75, ">=75%", "<75%"))
+
+# Characteristics relating to justices
+justices <- justices_raw %>%
+  select(
+    justiceId = justice, 
+    justiceYearAppointed = yearAppointed, 
+    justicePresidentId = presidentId, 
+    justiceGender = gender, 
+    justiceBirthYear = birthYear, 
+    justiceState = state, 
+    justiceReligion = religion, 
+    justiceEthnicity = ethnicity,
+    votesForAppointed = votesFor,
+    votesAgainstAppointed = votesAgainst,
+    justiceLowerCourt = lowerCourt) %>%
+  left_join(
+    select(presidents, -name, startYear, endYear), 
+    by = c("justicePresidentId" = "presidentId")) %>%
+  rename(justicePresidentParty = party) 
+
+# Gender column disappeared so I mapped it one more time
+justiceGender <- sqldf('SELECT justiceID, justiceGender FROM justices')
+
+sc_decisions <- sc_decisions %>%
+  left_join(justiceGender, by = c("justiceName" = "justiceId"))
                 
 # Rearrange columns for model fitting
-sc_decisions_final <- sc_decisions %>%
-  select(
-    chief, 
-    lcDisagreement,
-    lcDispositionDirection,
-    issueArea,
-    adminActionBool,
-    oralArgBool,
-    reargBool,
-    decisionTime,
-    formerCourt,
-    CourtApproval,
-    caseOriginRegion,
-    caseOriginCourt)
-
 sc_decisions_final <- sqldf('
                             SELECT chief                    AS c_chief
                                    ,lcDisagreement          AS c_lcDisagreement
@@ -323,6 +333,7 @@ sc_decisions_final <- sqldf('
                                    ,senateMajority          AS e_senateMajority
                                    ,decisionPresidentParty  AS e_decisionPresidentParty
                                    ,courtApproval           AS e_JCApproval
+                                   ,justiceGender           AS j_justiceGender
                                    ,justiceDecisionAgeBand  AS j_justiceDecisionAgeBand
                                    ,justiceRegion           AS j_justiceRegion
                                    ,justiceReligion         AS j_justiceReligion
