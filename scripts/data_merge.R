@@ -12,10 +12,7 @@ library(janitor)
 googlesheets4::gs4_deauth()
 
 # Supreme Court decisions data
-# sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
-
-# Alternate reading code in case here didn't work
- sc_decisions_raw <- read_csv("GitHub/supreme-court/data/SCDB_2021_01_justiceCentered_Citation.csv")
+sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
 
 # Import external data
 extra_data_sheet <- "https://docs.google.com/spreadsheets/d/1QzVsdjHLv5Mr3eSMi7CSVvd5z3qwUd7K349cAMwaqRg/edit?usp=sharing"
@@ -65,9 +62,8 @@ justices <- justices_raw %>%
     votesAgainstAppointed = votesAgainst,
     justiceLowerCourt = lowerCourt) %>%
   left_join(
-    select(presidents, -name, startYear, endYear), 
-    by = c("justicePresidentId" = "presidentId")) %>%
-  rename(justicePresidentParty = party) 
+    select(presidents, presidentId, startYear, endYear, justicePresidentParty=party), 
+    by = c("justicePresidentId" = "presidentId"))
 
 # Put data together
 sc_decisions <- sc_decisions_raw %>%
@@ -293,25 +289,6 @@ sc_decisions <- sc_decisions %>%
 sc_decisions <- sc_decisions %>% 
   mutate(justiceVotesAppointed = if_else(votesForAppointed/(votesForAppointed+votesAgainstAppointed) >= 0.75, ">=75%", "<75%"))
 
-# Characteristics relating to justices
-justices <- justices_raw %>%
-  select(
-    justiceId = justice, 
-    justiceYearAppointed = yearAppointed, 
-    justicePresidentId = presidentId, 
-    justiceGender = gender, 
-    justiceBirthYear = birthYear, 
-    justiceState = state, 
-    justiceReligion = religion, 
-    justiceEthnicity = ethnicity,
-    votesForAppointed = votesFor,
-    votesAgainstAppointed = votesAgainst,
-    justiceLowerCourt = lowerCourt) %>%
-  left_join(
-    select(presidents, -name, startYear, endYear), 
-    by = c("justicePresidentId" = "presidentId")) %>%
-  rename(justicePresidentParty = party) 
-
 # Gender column disappeared so I mapped it one more time
 justiceGender <- sqldf('SELECT justiceID, justiceGender FROM justices')
 
@@ -350,6 +327,37 @@ sc_decisions_final <- sqldf('
                             FROM sc_decisions
                             ')
 
+sc_decisions_final <- sqldf('
+                            SELECT chief                    AS c_chief
+                                   ,lcDisagreement          AS c_lcDisagreement
+                                   ,lcDispositionDirection  AS c_lcDispositionDirection
+                                   ,issueArea               AS c_issueArea
+                                   ,adminActionBool         AS c_adminActionBool
+                                   ,oralArgBool             AS c_oralArgBool
+                                   ,reargBool               AS c_reargBool
+                                   ,CASE 
+                                      WHEN decisionTime <= 30 THEN "0-30 Days"
+                                      WHEN decisionTime <= 180 THEN "31-180 Days"
+                                      ELSE "181+ Days"
+                                    END AS c_decisionTime
+                                   ,formerCourt             AS c_formerCourt
+                                   ,caseOriginRegion        AS c_caseOriginRegion
+                                   ,caseOriginCourt         AS c_caseOriginCourt
+                                   ,houseMajority           AS e_houseMajority
+                                   ,senateMajority          AS e_senateMajority
+                                   ,decisionPresidentParty  AS e_decisionPresidentParty
+                                   ,courtApproval           AS e_JCApproval
+                                   ,justiceGender           AS j_justiceGender
+                                   ,justiceDecisionAgeBand  AS j_justiceDecisionAgeBand
+                                   ,justiceRegion           AS j_justiceRegion
+                                   ,justiceReligion         AS j_justiceReligion
+                                   ,justiceEthnicity        AS j_justiceEthnicity
+                                   ,justicePresidentParty   AS j_justicePresidentParty
+                                   ,justiceVotesAppointed   AS j_justiceVotesAppointed
+                                   ,direction
+                            FROM sc_decisions
+                            ')
+
 # write final df to data file
-write.csv(sc_decisions_final, here("data/sc_decisions_final.csv"))
+write_csv(sc_decisions_final, here("data/sc_decisions_final.csv"))
 
