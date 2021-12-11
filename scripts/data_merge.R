@@ -13,6 +13,7 @@ googlesheets4::gs4_deauth()
 
 # Supreme Court decisions data
 sc_decisions_raw <- read_csv(here("data/SCDB_2021_01_justiceCentered_Citation.csv"))
+#sc_decisions_raw <- read_csv("/Users/christinawang/Desktop/STA2052/supreme-court/data/SCDB_2021_01_justiceCentered_Citation.csv")
 
 # Import external data
 extra_data_sheet <- "https://docs.google.com/spreadsheets/d/1QzVsdjHLv5Mr3eSMi7CSVvd5z3qwUd7K349cAMwaqRg/edit?usp=sharing"
@@ -324,6 +325,7 @@ sc_decisions_final <- sqldf('
                                    ,justicePresidentParty   AS j_justicePresidentParty
                                    ,justiceVotesAppointed   AS j_justiceVotesAppointed
                                    ,direction
+                                   ,yearDecision
                             FROM sc_decisions
                             ')
 
@@ -355,6 +357,7 @@ sc_decisions_final <- sqldf('
                                    ,justicePresidentParty   AS j_justicePresidentParty
                                    ,justiceVotesAppointed   AS j_justiceVotesAppointed
                                    ,direction
+                                   ,yearDecision
                             FROM sc_decisions
                             ')
 
