@@ -324,6 +324,7 @@ sc_decisions_final <- sqldf('
                                    ,justicePresidentParty   AS j_justicePresidentParty
                                    ,justiceVotesAppointed   AS j_justiceVotesAppointed
                                    ,direction
+                                   ,yearDecision
                             FROM sc_decisions
                             ')
 
@@ -355,6 +356,7 @@ sc_decisions_final <- sqldf('
                                    ,justicePresidentParty   AS j_justicePresidentParty
                                    ,justiceVotesAppointed   AS j_justiceVotesAppointed
                                    ,direction
+                                   ,yearDecision
                             FROM sc_decisions
                             ')
 
