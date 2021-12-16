@@ -1,6 +1,6 @@
-# Exploring Partisan Influences on US Supreme Court Decisions
+# Exploring Extra-Legal Influences on US Supreme Court Decisions
 
-* Title: Exploring Partisan Influences on US Supreme Court Decisions
+* Title: Exploring Extra-Legal Influences on US Supreme Court Decisions
 * Authors: [Michael Chong](https://github.com/michael-chong), [Kevin Hu](https://github.com/tkevinhu), [Gregory Maulet](https://github.com/gregmaulet), and [Christina Wang](https://github.com/thechrisssy)
 
 # Description
