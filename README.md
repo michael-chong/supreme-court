@@ -1,7 +1,7 @@
 # Exploring Partisan Influences on US Supreme Court Decisions
 
 * Title: Exploring Partisan Influences on US Supreme Court Decisions
-* Authors: [Michael Chong](https://github.com/michael-chong), [Kevin Hu](https://github.com/tkevinhu), [Gregory Maulet](), and [Christina Wang](https://github.com/thechrisssy)
+* Authors: [Michael Chong](https://github.com/michael-chong), [Kevin Hu](https://github.com/tkevinhu), [Gregory Maulet](https://github.com/gregmaulet), and [Christina Wang](https://github.com/thechrisssy)
 
 # Description
 This repository cotnains all our data and modelling work for predicting Supreme Court `decision direction`. All code are set to be reproducible.
@@ -16,4 +16,4 @@ The data used in this project originates from [The Supreme Court Database](http:
 * Figures [here](https://github.com/michael-chong/supreme-court/tree/main/output)
 
 # Version
-This repository was last updated on: December 14, 2021
+This repository was last updated on: December 15, 2021
